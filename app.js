@@ -15,7 +15,7 @@ function wishCard(wish, role) {
   const action = role === 'family_viewer'
     ? (wish.reserved ? '<span class="reserved">Reserved for Santa</span>' : `<button class="reserve" data-reserve="${wish.id}">I’ll get this</button>`)
     : `<button class="remove" data-remove="${wish.id}">Remove</button>`;
-  return `<article class="wish"><div><span class="priority ${wish.priority}">${nice[wish.priority]}</span><h3>${esc(wish.title)}</h3>${wish.notes ? `<p>${esc(wish.notes)}</p>` : ''}<div class="wish-links">${wish.url ? `<a href="${esc(wish.url)}" target="_blank" rel="noreferrer">Child’s exact link</a>` : ''}<a href="${searchUrl}" target="_blank" rel="noreferrer">Find it on Google</a></div></div>${action}</article>`;
+  return `<article class="wish"><div class="wish-copy"><span class="priority ${wish.priority}">${nice[wish.priority]}</span><h3>${esc(wish.title)}</h3>${wish.notes ? `<p>${esc(wish.notes)}</p>` : ''}<nav class="wish-links">${wish.url ? `<a href="${esc(wish.url)}" target="_blank" rel="noreferrer">Child’s exact link</a>` : ''}<a href="${searchUrl}" target="_blank" rel="noreferrer">Find it on Google</a></nav></div><div class="wish-action">${action}</div></article>`;
 }
 
 function render() {
@@ -30,7 +30,7 @@ function render() {
   const grouped = children.map(c => ({...c, wishes: wishes.filter(w => w.childId === c.id)}));
   const intro = role === 'child_editor'
     ? `<div class="hero"><div><div class="eyebrow">Your Santa list</div><h1>Hi ${esc(children[0]?.name || '')}!</h1><p class="lead">Pop your best ideas on the list. The elves will keep it tidy.</p></div><img src="santa-crew-hero.webp" alt="Santa, elves and a reindeer in glasses flying through a snowy night" /></div>`
-    : `<div class="eyebrow">Family gift list</div><h1>${esc(group.name)}</h1><p class="lead">Choose a wish to make Christmas magic. Reservations stay hidden from the kids.</p>`;
+    : `<div class="family-hero"><div><div class="eyebrow">Family gift list</div><h1>${esc(group.name)}</h1><p class="lead">Choose a wish to make Christmas magic. Reservations stay hidden from the kids.</p></div><img src="santa-crew-hero.webp" alt="Santa, elves and a reindeer in glasses flying through a snowy night" /></div>`;
   root.innerHTML = `${intro}
     ${role === 'child_editor' ? `<form id="add-wish" class="wish-form"><input name="title" required maxlength="180" placeholder="What would you like?" /><select name="priority"><option value="lovely">Lovely</option><option value="would_love" selected>Would love</option><option value="dream_gift">Dream gift</option></select><input name="url" type="url" placeholder="A link (optional)" /><textarea name="notes" maxlength="300" placeholder="Colour, size or a little note (optional)"></textarea><button>Add to my list</button></form>` : ''}
     <section class="lists">${grouped.map(c => `<div class="list"><h2>${esc(c.name)}’s wishes <span>${c.wishes.length}</span></h2>${c.wishes.length ? c.wishes.map(w => wishCard(w, role)).join('') : '<p class="empty">No wishes added yet.</p>'}</div>`).join('')}</section>`;
