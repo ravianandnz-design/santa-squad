@@ -70,7 +70,11 @@ begin
       from public.children c where c.group_id = g.id and (link_row.role <> 'child_editor' or c.id = link_row.child_id)), '[]'::jsonb),
     'wishes', coalesce((select jsonb_agg(jsonb_build_object(
       'id', w.id, 'childId', w.child_id, 'title', w.title, 'url', w.url, 'notes', w.notes,
-      'priority', w.priority, 'reserved', exists(select 1 from public.reservations r where r.wish_id = w.id)
+      'priority', w.priority,
+      'reserved', exists(select 1 from public.reservations r where r.wish_id = w.id),
+      'reservedBy', case when link_row.role = 'family_viewer' then (
+        select r.reserved_by from public.reservations r where r.wish_id = w.id order by r.created_at desc limit 1
+      ) else null end
     ) order by w.created_at desc) from public.wishes w join public.children c on c.id = w.child_id
       where c.group_id = g.id and (link_row.role <> 'child_editor' or c.id = link_row.child_id)), '[]'::jsonb)
   ) into result from public.family_groups g where g.id = link_row.group_id;

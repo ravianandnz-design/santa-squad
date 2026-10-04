@@ -13,7 +13,7 @@ async function rpc(name, args) { const { data, error } = await client.rpc(name, 
 function wishCard(wish, role) {
   const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(wish.title)}`;
   const action = role === 'family_viewer'
-    ? (wish.reserved ? '<span class="reserved">Reserved for Santa</span>' : `<button class="reserve" data-reserve="${wish.id}">I’ll get this</button>`)
+    ? (wish.reserved ? `<span class="reserved">Claimed by ${esc(wish.reservedBy || 'a family member')}</span>` : `<button class="reserve" data-reserve="${wish.id}">I’ll get this</button>`)
     : `<button class="remove" data-remove="${wish.id}">Remove</button>`;
   return `<article class="wish"><div class="wish-copy"><span class="priority ${wish.priority}">${nice[wish.priority]}</span><h3>${esc(wish.title)}</h3>${wish.notes ? `<p>${esc(wish.notes)}</p>` : ''}<nav class="wish-links">${wish.url ? `<a href="${esc(wish.url)}" target="_blank" rel="noreferrer">Child’s exact link</a>` : ''}<a href="${searchUrl}" target="_blank" rel="noreferrer">Find it on Google</a></nav></div><div class="wish-action">${action}</div></article>`;
 }
