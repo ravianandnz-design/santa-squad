@@ -4,6 +4,7 @@ const config = window.SANTA_CONFIG || {};
 const client = config.url?.startsWith('http') ? window.supabase.createClient(config.url, config.key) : null;
 let data;
 const nice = { lovely: 'Lovely', would_love: 'Would love', dream_gift: 'Dream gift' };
+const occasionName = { santa: 'Santa', birthday: 'Birthday' };
 
 function esc(value = '') { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function linkFor(next) { return `${location.origin}${location.pathname}?access=${next}`; }
@@ -12,10 +13,25 @@ async function rpc(name, args) { const { data, error } = await client.rpc(name, 
 
 function wishCard(wish, role) {
   const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(wish.title)}`;
+  const occasion = wish.occasion === 'birthday' ? 'birthday' : 'santa';
   const action = role === 'family_viewer'
     ? (wish.reserved ? `<span class="reserved">Claimed by ${esc(wish.reservedBy || 'a family member')}</span>` : `<button class="reserve" data-reserve="${wish.id}">I’ll get this</button>`)
     : `<button class="remove" data-remove="${wish.id}">Remove</button>`;
-  return `<article class="wish"><div class="wish-copy"><span class="priority ${wish.priority}">${nice[wish.priority]}</span><h3>${esc(wish.title)}</h3>${wish.notes ? `<p>${esc(wish.notes)}</p>` : ''}<nav class="wish-links">${wish.url ? `<a href="${esc(wish.url)}" target="_blank" rel="noreferrer">Child’s exact link</a>` : ''}<a href="${searchUrl}" target="_blank" rel="noreferrer">Find it on Google</a></nav></div><div class="wish-action">${action}</div></article>`;
+  return `<article class="wish"><div class="wish-copy"><div class="wish-tags"><span class="occasion ${occasion}">${occasionName[occasion]}</span><span class="priority ${wish.priority}">${nice[wish.priority]}</span></div><h3>${esc(wish.title)}</h3>${wish.notes ? `<p>${esc(wish.notes)}</p>` : ''}<nav class="wish-links">${wish.url ? `<a href="${esc(wish.url)}" target="_blank" rel="noreferrer">Child’s exact link</a>` : ''}<a href="${searchUrl}" target="_blank" rel="noreferrer">Find it on Google</a></nav></div><div class="wish-action">${action}</div></article>`;
+}
+
+function wishRows(wishes, emptyText) {
+  return wishes.length ? wishes.map(w => wishCard(w, data.role)).join('') : `<p class="empty">${emptyText}</p>`;
+}
+
+function childList(child) {
+  const birthdayWishes = child.wishes.filter(w => w.occasion === 'birthday');
+  const santaWishes = child.wishes.filter(w => w.occasion !== 'birthday');
+  const hasTwoLists = child.name === 'Maansi Anand' || birthdayWishes.length > 0;
+  const body = hasTwoLists
+    ? `<div class="occasion-section birthday-section"><h3>🎂 Birthday wishes <span>${birthdayWishes.length}</span></h3>${wishRows(birthdayWishes, 'No birthday wishes added yet.')}</div><div class="occasion-section santa-section"><h3>🎅 Santa wishes <span>${santaWishes.length}</span></h3>${wishRows(santaWishes, 'No Santa wishes added yet.')}</div>`
+    : wishRows(santaWishes, 'No wishes added yet.');
+  return `<div class="list"><h2>${esc(child.name)}’s wishes <span>${child.wishes.length}</span></h2>${body}</div>`;
 }
 
 function render() {
@@ -28,12 +44,13 @@ function render() {
     return;
   }
   const grouped = children.map(c => ({...c, wishes: wishes.filter(w => w.childId === c.id)}));
+  const maansiBirthdayList = role === 'child_editor' && children[0]?.name === 'Maansi Anand';
   const intro = role === 'child_editor'
-    ? `<div class="hero"><div><div class="eyebrow">Your Santa list</div><h1>Hi ${esc(children[0]?.name || '')}!</h1><p class="lead">Pop your best ideas on the list. The elves will keep it tidy.</p></div><img src="santa-crew-hero.webp" alt="Santa, elves and a reindeer in glasses flying through a snowy night" /></div>`
+    ? `<div class="hero"><div><div class="eyebrow">${maansiBirthdayList ? 'Birthday & Santa wishes' : 'Your Santa list'}</div><h1>Hi ${esc(children[0]?.name || '')}!</h1><p class="lead">${maansiBirthdayList ? 'Add birthday ideas, Santa ideas, or both. The elves will keep it tidy.' : 'Pop your best ideas on the list. The elves will keep it tidy.'}</p></div><img src="santa-crew-hero.webp" alt="Santa, elves and a reindeer in glasses flying through a snowy night" /></div>`
     : `<div class="eyebrow">Family gift list</div><h1>${esc(group.name)}</h1><p class="lead">Choose a wish to make Christmas magic. Reservations stay hidden from the kids.</p>`;
   root.innerHTML = `${intro}
-    ${role === 'child_editor' ? `<form id="add-wish" class="wish-form"><input name="title" required maxlength="180" placeholder="What would you like?" /><select name="priority"><option value="lovely">Lovely</option><option value="would_love" selected>Would love</option><option value="dream_gift">Dream gift</option></select><input name="url" type="url" placeholder="A link (optional)" /><textarea name="notes" maxlength="300" placeholder="Colour, size or a little note (optional)"></textarea><button>Add to my list</button></form>` : ''}
-    <section class="lists">${grouped.map(c => `<div class="list"><h2>${esc(c.name)}’s wishes <span>${c.wishes.length}</span></h2>${c.wishes.length ? c.wishes.map(w => wishCard(w, role)).join('') : '<p class="empty">No wishes added yet.</p>'}</div>`).join('')}</section>`;
+    ${role === 'child_editor' ? `<form id="add-wish" class="wish-form"><input name="title" required maxlength="180" placeholder="What would you like?" /><select name="occasion" aria-label="Wish type"><option value="santa" selected>🎅 Santa wish</option><option value="birthday">🎂 Birthday wish</option></select><select name="priority"><option value="lovely">Lovely</option><option value="would_love" selected>Would love</option><option value="dream_gift">Dream gift</option></select><input name="url" type="url" placeholder="A link (optional)" /><textarea name="notes" maxlength="300" placeholder="Colour, size or a little note (optional)"></textarea><button>Add to my list</button></form>` : ''}
+    <section class="lists">${grouped.map(childList).join('')}</section>`;
 }
 
 async function load() {
@@ -46,7 +63,7 @@ async function load() {
 root.addEventListener('submit', async e => {
   e.preventDefault(); const form = e.target; const f = new FormData(form);
   try {
-    if (form.id === 'add-wish') await rpc('add_wish', { p_token: token, p_title: f.get('title'), p_url: f.get('url'), p_notes: f.get('notes'), p_priority: f.get('priority') });
+    if (form.id === 'add-wish') await rpc('add_wish', { p_token: token, p_title: f.get('title'), p_url: f.get('url'), p_notes: f.get('notes'), p_priority: f.get('priority'), p_occasion: f.get('occasion') });
     if (form.id === 'add-child') { const child = await rpc('create_child_link', { p_token: token, p_name: f.get('name') }); await navigator.clipboard?.writeText(linkFor(child.token)); message(`${child.name}’s edit link copied — send it to them.`); }
     form.reset(); await load();
   } catch (error) { message(error.message); }

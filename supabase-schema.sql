@@ -35,6 +35,7 @@ create table public.wishes (
   url text,
   notes text,
   priority public.wish_priority not null default 'would_love',
+  occasion text not null default 'santa' check (occasion in ('santa', 'birthday')),
   created_at timestamptz not null default now()
 );
 
@@ -70,7 +71,7 @@ begin
       from public.children c where c.group_id = g.id and (link_row.role <> 'child_editor' or c.id = link_row.child_id)), '[]'::jsonb),
     'wishes', coalesce((select jsonb_agg(jsonb_build_object(
       'id', w.id, 'childId', w.child_id, 'title', w.title, 'url', w.url, 'notes', w.notes,
-      'priority', w.priority,
+      'priority', w.priority, 'occasion', w.occasion,
       'reserved', exists(select 1 from public.reservations r where r.wish_id = w.id),
       'reservedBy', case when link_row.role = 'family_viewer' then (
         select r.reserved_by from public.reservations r where r.wish_id = w.id order by r.created_at desc limit 1
@@ -81,13 +82,14 @@ begin
   return result;
 end $$;
 
-create function public.add_wish(p_token text, p_title text, p_url text default null, p_notes text default null, p_priority public.wish_priority default 'would_love')
+create function public.add_wish(p_token text, p_title text, p_url text default null, p_notes text default null, p_priority public.wish_priority default 'would_love', p_occasion text default 'santa')
 returns uuid language plpgsql security definer set search_path = public as $$
 declare link_row public.access_links; new_id uuid;
 begin
   select * into link_row from public.access_links where token = p_token and active and role = 'child_editor';
   if not found then raise exception 'Only a child’s edit link can add wishes.' using errcode = 'P0001'; end if;
-  insert into public.wishes(child_id,title,url,notes,priority) values (link_row.child_id,trim(p_title),nullif(trim(p_url),''),nullif(trim(p_notes),''),p_priority) returning id into new_id;
+  if p_occasion not in ('santa', 'birthday') then raise exception 'Choose Santa or Birthday for this wish.' using errcode = 'P0001'; end if;
+  insert into public.wishes(child_id,title,url,notes,priority,occasion) values (link_row.child_id,trim(p_title),nullif(trim(p_url),''),nullif(trim(p_notes),''),p_priority,p_occasion) returning id into new_id;
   return new_id;
 end $$;
 
@@ -136,7 +138,7 @@ end $$;
 
 revoke all on all tables in schema public from anon, authenticated;
 grant usage on schema public to anon;
-grant execute on function public.portal_for(text), public.add_wish(text,text,text,text,public.wish_priority), public.remove_wish(text,uuid), public.reserve_wish(text,uuid,text,text), public.create_child_link(text,text), public.create_family_viewer_link(text) to anon;
+grant execute on function public.portal_for(text), public.add_wish(text,text,text,text,public.wish_priority,text), public.remove_wish(text,uuid), public.reserve_wish(text,uuid,text,text), public.create_child_link(text,text), public.create_family_viewer_link(text) to anon;
 
 -- One family administrator link. Save the returned token in your first URL:
 -- select token from public.access_links where role = 'admin';
